@@ -1,0 +1,47 @@
+Methode 1:
+---------
+
+sudo openssl genrsa -out private.pem
+sudo openssl rsa -in private.pem -pubout -out pubkey.crt
+
+sudo tpm2_clear -c p
+sudo tpm2_flushcontext -tls
+
+sudo tpm2_createprimary -G rsa2048 -C o -c parent.ct
+sudo tpm2_import -C parent.ct -G rsa -i private.pem -u key.pub  -r key.priv
+sudo tpm2_flushcontext -tls
+sudo tpm2_load -C parent.ct -u key.pub -r key.priv -c key.ctx
+sudo tpm2_evictcontrol -C o -c key.ctx 0x81010002
+sudo tpm2_flushcontext -tls
+
+echo "SignData" > data.bin
+sudo tpm2_sign -c 0x81010002 -g sha256 -o sign.rsa -f plain data.bin
+
+sudo openssl dgst -verify pubkey.crt -keyform pem -sha256 -signature sign.rsa data.bin
+
+echo "KalyanasundaresunA" > msg.dat
+sudo tpm2_rsaencrypt -c 0x81010002 -o msg.enc msg.dat
+
+sudo tpm2_rsadecrypt -c 0x81010002 -o msg.ptext msg.enc
+
+******** ------------------------------- ********
+
+Methode 2:
+---------
+
+sudo tpm2_startup -c
+
+sudo tpm2_clear -c p
+sudo tpm2_flushcontext -tls
+
+
+openssl genrsa -out private.pem 2048
+sudo tpm2_loadexternal -C n -Grsa -a "userwithauth|noda|decrypt|sign" -r private.pem -c key.ctx
+
+// sudo tpm2_evictcontrol -C o -c key.ctx -o primary.handle // this give error // Not Working for me
+
+echo "my message" > msg.dat
+sudo tpm2_rsaencrypt -c key.ctx -o msg.enc msg.dat
+
+sudo tpm2_rsadecrypt -c key.ctx -o msg.ptext msg.enc
+
